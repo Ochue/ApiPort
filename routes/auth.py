@@ -1,64 +1,79 @@
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
-from crud import authenticate_user, create_user
-from database import SessionLocal
-from passlib.context import CryptContext  # Importar la librería correcta
+from sqlalchemy.orm import Session
+from database import get_db
 from models.user import User
-from typing import Optional
-from datetime import timedelta
-from utils.auth_handler import create_access_token  # Asegúrate de importar esta función
+from schemas.user import UserCreate, UserLogin  # type: ignore # Importamos los esquemas
+from passlib.context import CryptContext
+from jose import jwt
+from datetime import datetime, timedelta
 
 router = APIRouter()
-
-# Configuración del contexto para hash de contraseñas
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# Modelo para los datos de registro
-class RegisterRequest(BaseModel):
-    username: str
-    email: str
-    password: str
+SECRET_KEY = "secret_key"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
-# Ruta para registrar un nuevo usuario
+# Función para cifrar contraseñas
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+# Función para verificar contraseñas
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+# Función para generar token
+def create_access_token(data: dict, expires_delta: timedelta = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + expires_delta
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+# REGISTRO
 @router.post("/register")
-async def register_user(register_request: RegisterRequest):
-    db = SessionLocal()
-    try:
-        # Hash de la contraseña
-        hashed_password = pwd_context.hash(register_request.password)
+def register(user_data: UserCreate, db: Session = Depends(get_db)):
+    existing_user = db.query(User).filter(User.email == user_data.email).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
 
-        # Crear el usuario
-        user = User(username=register_request.username, email=register_request.email, password=hashed_password)
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-        return {"message": "Usuario creado correctamente", "user_id": user.id}
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=400, detail="Error al crear el usuario: " + str(e))
-    finally:
-        db.close()
+    hashed_password = hash_password(user_data.password)
+    new_user = User(
+        full_name=user_data.full_name,
+        email=user_data.email,
+        password=hashed_password
+    )
 
-# Modelo para los datos de login
-class LoginRequest(BaseModel):
-    username: str
-    password: str
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)  # Aquí refrescamos el objeto para obtener el ID
 
-# Ruta de login
+    return {"message": "Ususario registrado correctamente", "user_id": new_user.id}
+
+# LOGIN
 @router.post("/login")
-async def login(login_request: LoginRequest):
-    db = SessionLocal()
-    try:
-        # Intentar autenticar al usuario
-        user = authenticate_user(db, login_request.username, login_request.password)
+def login(user_data: UserLogin, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == user_data.email).first()
+    if not user or not verify_password(user_data.password, user.password):
+        raise HTTPException(status_code=401, detail="Error! Contraseña o Email incorrecto!")
 
-        # Generar el token de acceso
-        access_token_expires = timedelta(minutes=30)  # Expira en 30 minutos
-        access_token = create_access_token(data={"sub": user.username}, expires_delta=access_token_expires)
+    # Generar token JWT
+    access_token = create_access_token(data={"sub": user.email})
 
-        return {"message": "Login successful", "access_token": access_token, "token_type": "bearer"}
+    return {"access_token": access_token, "token_type": "bearer"}
 
-    except HTTPException as e:
-        raise e
-    finally:
-        db.close()
+# GET USER BY ID (INCLUYENDO EL TOKEN)
+@router.get("/user/{user_id}")
+def get_user(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado!")
+    
+    # Generar el token para el usuario recuperado
+    access_token = create_access_token(data={"sub": user.email})
+
+    return {
+        "user_id": user.id,
+        "full_name": user.full_name,
+        "email": user.email,
+        "access_token": access_token
+    }
