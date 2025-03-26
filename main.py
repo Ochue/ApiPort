@@ -1,10 +1,20 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from routes import auth, portfolio
 from database import engine
 from models.portfolio import Portfolio
 import os
 
 app = FastAPI()
+
+# Habilitar CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Permitir todos los orígenes, cambia según tus necesidades
+    allow_credentials=True,
+    allow_methods=["*"],  # Permitir todos los métodos HTTP
+    allow_headers=["*"],  # Permitir todos los encabezados
+)
 
 # Crear las tablas en la base de datos al iniciar la aplicación
 Portfolio.metadata.create_all(bind=engine)
