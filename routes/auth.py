@@ -12,7 +12,7 @@ from fastapi.security import OAuth2PasswordBearer  # Asegúrate de importar esto
 router = APIRouter()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-SECRET_KEY = "secret_key"
+SECRET_KEY = "@Chuchoman23"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
