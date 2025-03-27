@@ -1,3 +1,4 @@
+# routes/auth.py
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from database import get_db
@@ -8,7 +9,7 @@ from schemas.user import UserCreate, UserLogin
 from passlib.context import CryptContext
 from jose import jwt
 from datetime import datetime, timedelta
-from fastapi.security import OAuth2PasswordBearer  # Asegúrate de importar esto
+from fastapi.security import OAuth2PasswordBearer
 
 router = APIRouter()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -18,7 +19,7 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 # Crear la dependencia oauth2_scheme para obtener el token
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")  # Definir oauth2_scheme correctamente
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 # Función para cifrar contraseñas
 def hash_password(password: str) -> str:
@@ -38,20 +39,25 @@ def create_access_token(data: dict, expires_delta: timedelta = timedelta(minutes
 # REGISTRO
 @router.post("/register")
 def register(user_data: UserCreate, db: Session = Depends(get_db)):
+    # Verificar si el correo ya está registrado
     existing_user = db.query(User).filter(User.email == user_data.email).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
 
+    # Hashear la contraseña
     hashed_password = hash_password(user_data.password)
+
+    # Crear nuevo usuario usando hashed_password
     new_user = User(
         full_name=user_data.full_name,
         email=user_data.email,
-        password=hashed_password
+        hashed_password=hashed_password
     )
 
+    # Guardar el nuevo usuario en la base de datos
     db.add(new_user)
     db.commit()
-    db.refresh(new_user)  # Aquí refrescamos el objeto para obtener el ID
+    db.refresh(new_user)  # Refrescar para obtener el ID
 
     return {"message": "Usuario registrado correctamente", "user_id": new_user.id}
 
@@ -62,13 +68,13 @@ def login(user_data: LoginRequest, db: Session = Depends(get_db)):
     if not user or not verify_password(user_data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
+    # Generar el token de acceso
     token = create_access_token({"sub": user.email})
     return {"access_token": token, "token_type": "bearer"}
 
-
 # GET USER BY ID (INCLUYENDO EL PORTAFOLIO)
 @router.get("/user/{user_id}")
-def get_user(user_id: int, db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):  # Aquí se pasa el token como dependencia
+def get_user(user_id: int, db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado!")
