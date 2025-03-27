@@ -10,14 +10,13 @@ app = FastAPI()
 # Habilitar CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "https://apiport.onrender.com"],  # Permitimos ambos orígenes
+    allow_origins=["http://localhost:5173", "https://apiport.onrender.com"],  # Dominios permitidos
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Métodos permitidos
-    allow_headers=["*"],  # Permite todos los headers
-    expose_headers=["*"],
-    max_age=600,
+    allow_headers=["*"],  # Cabeceras permitidas
+    expose_headers=["*"],  # Cabeceras que se pueden exponer al cliente
+    max_age=600,  # Tiempo en segundos que el navegador puede almacenar los resultados de la comprobación de CORS
 )
-
 
 # Crear las tablas en la base de datos al iniciar la aplicación
 Portfolio.metadata.create_all(bind=engine)
@@ -32,6 +31,6 @@ def read_root():
 
 if __name__ == "__main__":
     import uvicorn
-    HOST = os.getenv("HOST", "127.0.0.1")  # Por defecto localhost
-    PORT = int(os.getenv("PORT", 8000))    # Por defecto puerto 8000
+    HOST = os.getenv("HOST", "127.0.0.1")
+    PORT = int(os.getenv("PORT", 8000))
     uvicorn.run(app, host=HOST, port=PORT)
