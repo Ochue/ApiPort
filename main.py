@@ -7,21 +7,21 @@ import os
 
 app = FastAPI()
 
-# Habilitar CORS
+# Configuración CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "https://apiport.onrender.com"],  # Dominios permitidos
+    allow_origins=["http://localhost:5173", "https://apiport.onrender.com"],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Métodos permitidos
-    allow_headers=["*"],  # Cabeceras permitidas
-    expose_headers=["*"],  # Cabeceras que se pueden exponer al cliente
-    max_age=600,  # Tiempo en segundos que el navegador puede almacenar los resultados de la comprobación de CORS
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=600,
 )
 
-# Crear las tablas en la base de datos al iniciar la aplicación
+# Crear las tablas
 Portfolio.metadata.create_all(bind=engine)
 
-# Incluir los routers
+# Incluir rutas
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(portfolio.router, prefix="/portfolio", tags=["portfolio"])
 

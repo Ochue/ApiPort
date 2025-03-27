@@ -3,17 +3,14 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, HttpUrl
 from typing import List, Optional
 import json
-import shutil
 import os
+from io import BytesIO
 from database import get_db
 from models.portfolio import Portfolio
 from models.user import User
 from utils.auth_handler import get_current_user
 
 router = APIRouter()
-
-UPLOAD_DIR = "uploads/"
-os.makedirs(UPLOAD_DIR, exist_ok=True)  # Crear la carpeta si no existe
 
 # 📌 Modelo para redes sociales
 class SocialMedia(BaseModel):
@@ -50,22 +47,15 @@ async def create_portfolio(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    cv_path = None
-    image_paths = []
+    # 📌 Leer el archivo CV y convertirlo en binario
+    cv_content = await cv_file.read()
 
-    # 📌 Guardar el archivo CV
-    if cv_file:
-        cv_path = os.path.join(UPLOAD_DIR, cv_file.filename)
-        with open(cv_path, "wb") as buffer:
-            shutil.copyfileobj(cv_file.file, buffer)
-
-    # 📌 Guardar imágenes de los proyectos
+    # 📌 Leer las imágenes y convertirlas en binario
+    image_contents = []
     if image_files:
         for image in image_files:
-            image_path = os.path.join(UPLOAD_DIR, image.filename)
-            with open(image_path, "wb") as buffer:
-                shutil.copyfileobj(image.file, buffer)
-            image_paths.append(image_path)
+            image_content = await image.read()
+            image_contents.append(image_content)
 
     # 📌 Convertir los datos a formato JSON
     social_links = [{"name": s.name, "link": str(s.link)} for s in portfolio_request.social_links]
@@ -74,7 +64,7 @@ async def create_portfolio(
             "title": p.title,
             "description": p.description,
             "type_technologies": p.type_technologies,
-            "image_file": image_paths[i] if i < len(image_paths) else None,
+            "image_file": image_contents[i] if i < len(image_contents) else None,
             "year": p.year
         }
         for i, p in enumerate(portfolio_request.projects)
@@ -89,8 +79,8 @@ async def create_portfolio(
         programming_languages=",".join(portfolio_request.programming_languages),
         projects=json.dumps(projects),
         social_links=json.dumps(social_links),
-        cv_file=cv_path,
-        image_file=image_paths[0] if image_paths else None
+        cv_file=cv_content,
+        image_files=image_contents
     )
 
     db.add(new_portfolio)
@@ -99,9 +89,7 @@ async def create_portfolio(
 
     return {
         "message": "Portafolio creado correctamente!",
-        "portfolio_id": new_portfolio.id,
-        "cv_file": cv_path,
-        "image_file": image_paths[0] if image_paths else None
+        "portfolio_id": new_portfolio.id
     }
 
 # 📌 **Ruta para obtener un portafolio**
@@ -111,6 +99,10 @@ async def get_portfolio(portfolio_id: int, db: Session = Depends(get_db)):
     if portfolio is None:
         raise HTTPException(status_code=404, detail="Portafolio no encontrado")
     
+    # 📌 Convertir archivos binarios a imágenes o archivos descargables
+    cv_file = portfolio.cv_file
+    image_files = portfolio.image_files
+
     return {
         "id": portfolio.id,
         "user_id": portfolio.user_id,
@@ -120,8 +112,8 @@ async def get_portfolio(portfolio_id: int, db: Session = Depends(get_db)):
         "programming_languages": portfolio.programming_languages.split(","),
         "projects": json.loads(portfolio.projects),
         "social_links": json.loads(portfolio.social_links),
-        "cv_file": portfolio.cv_file,
-        "image_file": portfolio.image_file
+        "cv_file": cv_file,  # En formato binario
+        "image_files": image_files  # Lista de archivos binarios
     }
 
 # 📌 **Ruta para actualizar un portafolio**
@@ -142,24 +134,18 @@ async def update_portfolio(
     if portfolio.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="No tienes permiso para actualizar este portafolio")
 
-    cv_path = portfolio.cv_file
-    image_paths = [portfolio.image_file] if portfolio.image_file else []
-
-    # 📌 Guardar nuevo CV si se sube
+    # 📌 Leer el nuevo CV y convertirlo en binario si es necesario
     if cv_file:
-        cv_path = os.path.join(UPLOAD_DIR, cv_file.filename)
-        with open(cv_path, "wb") as buffer:
-            shutil.copyfileobj(cv_file.file, buffer)
-        portfolio.cv_file = cv_path  
+        cv_content = await cv_file.read()
+        portfolio.cv_file = cv_content
 
-    # 📌 Guardar nuevas imágenes de proyectos
+    # 📌 Leer las nuevas imágenes y convertirlas en binario si es necesario
     if image_files:
-        image_paths = []
+        image_contents = []
         for image in image_files:
-            image_path = os.path.join(UPLOAD_DIR, image.filename)
-            with open(image_path, "wb") as buffer:
-                shutil.copyfileobj(image.file, buffer)
-            image_paths.append(image_path)
+            image_content = await image.read()
+            image_contents.append(image_content)
+        portfolio.image_files = image_contents
 
     # 📌 Actualizar campos
     portfolio.full_name = portfolio_request.full_name
@@ -172,7 +158,7 @@ async def update_portfolio(
             "title": p.title,
             "description": p.description,
             "type_technologies": p.type_technologies,
-            "image_file": image_paths[i] if i < len(image_paths) else None,
+            "image_file": image_contents[i] if i < len(image_contents) else None,
             "year": p.year
         }
         for i, p in enumerate(portfolio_request.projects)
@@ -200,12 +186,6 @@ async def delete_portfolio(
 
     if portfolio.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="No tienes permiso para eliminar este portafolio")
-
-    # 📌 Eliminar archivos asociados
-    if portfolio.cv_file and os.path.exists(portfolio.cv_file):
-        os.remove(portfolio.cv_file)
-    if portfolio.image_file and os.path.exists(portfolio.image_file):
-        os.remove(portfolio.image_file)
 
     db.delete(portfolio)
     db.commit()

@@ -5,7 +5,7 @@ from database import get_db
 from models.user import User
 from models.portfolio import Portfolio
 from schemas.auth import LoginRequest
-from schemas.user import UserCreate, UserLogin
+from schemas.user import UserCreate, LoginRequest
 from passlib.context import CryptContext
 from jose import jwt
 from datetime import datetime, timedelta
@@ -26,7 +26,7 @@ def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
 # Función para verificar contraseñas
-def verify_password(plain_password, hashed_password):
+def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 # Función para generar token
@@ -39,31 +39,29 @@ def create_access_token(data: dict, expires_delta: timedelta = timedelta(minutes
 # REGISTRO
 @router.post("/register")
 def register(user_data: UserCreate, db: Session = Depends(get_db)):
-    # Verificar si el correo ya está registrado
+    # Verifica si el email ya está registrado
     existing_user = db.query(User).filter(User.email == user_data.email).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    # Hashear la contraseña
+    # Hashea la contraseña
     hashed_password = hash_password(user_data.password)
-
-    # Crear nuevo usuario usando hashed_password
     new_user = User(
         full_name=user_data.full_name,
         email=user_data.email,
         hashed_password=hashed_password
     )
 
-    # Guardar el nuevo usuario en la base de datos
     db.add(new_user)
     db.commit()
-    db.refresh(new_user)  # Refrescar para obtener el ID
+    db.refresh(new_user)  # Refrescar el objeto para obtener el ID
 
     return {"message": "Usuario registrado correctamente", "user_id": new_user.id}
 
 # LOGIN
 @router.post("/login")
 def login(user_data: LoginRequest, db: Session = Depends(get_db)):
+    # Buscar al usuario por el email
     user = db.query(User).filter(User.email == user_data.email).first()
     if not user or not verify_password(user_data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
