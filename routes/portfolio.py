@@ -25,16 +25,14 @@ class SocialMedia(BaseModel):
         result["link"] = str(result["link"])
         return result
 
-# 📌 Modelo para proyectos
+# 📌 Modelo para proyectos (SIN link, con imagen)
 class ProjectRequest(BaseModel):
     title: str
     description: Optional[str] = None
-    link: HttpUrl
+    image: Optional[str] = None  # Reemplazo del "link"
 
     def dict(self, **kwargs):
-        result = super().dict(**kwargs)
-        result["link"] = str(result["link"])
-        return result
+        return super().dict(**kwargs)
 
 # 📌 Modelo del portafolio (Solicitud)
 class PortfolioRequest(BaseModel):
@@ -46,7 +44,7 @@ class PortfolioRequest(BaseModel):
     projects: List[ProjectRequest]  
     social_links: List[SocialMedia]  
 
-# 📌 **Ruta para crear un portafolio con archivos (CV e imagen)**
+# 📌 **Ruta para crear un portafolio con archivos (CV, imagen y proyectos)**
 @router.post("/")
 async def create_portfolio(
     portfolio_request: PortfolioRequest,
@@ -72,7 +70,7 @@ async def create_portfolio(
 
     # 📌 Convertir los datos a formato JSON
     social_links = [{"name": s.name, "link": str(s.link)} for s in portfolio_request.social_links]
-    projects = [{"title": p.title, "description": p.description, "link": str(p.link)} for p in portfolio_request.projects]
+    projects = [{"title": p.title, "description": p.description, "image": p.image} for p in portfolio_request.projects]
 
     # 📌 Crear la instancia del portafolio
     new_portfolio = Portfolio(
