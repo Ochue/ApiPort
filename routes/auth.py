@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models.user import User
 from models.portfolio import Portfolio
+from schemas.auth import LoginRequest
 from schemas.user import UserCreate, UserLogin
 from passlib.context import CryptContext
 from jose import jwt
@@ -56,7 +57,7 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
 
 # LOGIN
 @router.post("/login")
-def login(user_data: LoginRequest, db: Session = Depends(get_db)): # type: ignore
+def login(user_data: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == user_data.email).first()
     if not user or not verify_password(user_data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
