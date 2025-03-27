@@ -56,15 +56,14 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
 
 # LOGIN
 @router.post("/login")
-def login(user_data: UserLogin, db: Session = Depends(get_db)):
+def login(user_data: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == user_data.email).first()
-    if not user or not verify_password(user_data.password, user.password):
-        raise HTTPException(status_code=401, detail="Error! Contraseña o Email incorrecto!")
+    if not user or not verify_password(user_data.password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
-    # Generar token JWT
-    access_token = create_access_token(data={"sub": user.email})
+    token = create_access_token({"sub": user.email})
+    return {"access_token": token, "token_type": "bearer"}
 
-    return {"access_token": access_token, "token_type": "bearer"}
 
 # GET USER BY ID (INCLUYENDO EL PORTAFOLIO)
 @router.get("/user/{user_id}")
