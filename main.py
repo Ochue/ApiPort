@@ -10,12 +10,12 @@ app = FastAPI()
 # Habilitar CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Prueba con ["http://localhost:3000", "https://tudominio.com"]
+    allow_origins=["http://localhost:5173", "https://apiport.onrender.com"],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
-    expose_headers=["*"],  # Agrega esto
-    max_age=600,  # Agrega esto para mejorar rendimiento
+    expose_headers=["*"],
+    max_age=600,
 )
 
 
