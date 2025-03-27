@@ -10,11 +10,14 @@ app = FastAPI()
 # Habilitar CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Permitir todos los orígenes, cambia según tus necesidades
+    allow_origins=["*"],  # Prueba con ["http://localhost:3000", "https://tudominio.com"]
     allow_credentials=True,
-    allow_methods=["*"],  # Permitir todos los métodos HTTP
-    allow_headers=["*"],  # Permitir todos los encabezados
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+    expose_headers=["*"],  # Agrega esto
+    max_age=600,  # Agrega esto para mejorar rendimiento
 )
+
 
 # Crear las tablas en la base de datos al iniciar la aplicación
 Portfolio.metadata.create_all(bind=engine)

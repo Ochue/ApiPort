@@ -19,7 +19,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)  # Crear la carpeta si no existe
 class SocialMedia(BaseModel):
     name: str
     link: HttpUrl  
-
+   
     def dict(self, **kwargs):
         result = super().dict(**kwargs)
         result["link"] = str(result["link"])
