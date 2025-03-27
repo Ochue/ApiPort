@@ -193,5 +193,3 @@ async def delete_portfolio(
     db.commit()
 
     return {"message": "Portafolio eliminado correctamente!"}
-
-#s#
