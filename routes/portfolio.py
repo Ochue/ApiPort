@@ -25,12 +25,11 @@ class SocialMedia(BaseModel):
         result["link"] = str(result["link"])
         return result
 
-# 📌 Modelo para proyectos (con el nuevo nombre de campo "image_file")
+# 📌 Modelo para proyectos (sin "project_technologies")
 class ProjectRequest(BaseModel):
     title: str
     description: Optional[str] = None
     image_file: Optional[UploadFile] = None  # Reemplazo de "image" por "image_file"
-    type_technologies: List[str]
     year: Optional[int] = None
 
     def dict(self, **kwargs):
@@ -40,10 +39,10 @@ class ProjectRequest(BaseModel):
 class PortfolioRequest(BaseModel):
     full_name: str
     description: Optional[str] = None
-    type_technologies: List[str]  
+    type_technologies: List[str]  # Esto solo se usa para el portafolio
     spoken_languages: List[str]  
     programming_languages: List[str]  
-    projects: List[ProjectRequest]  
+    projects: List[ProjectRequest]  # No se menciona "project_technologies" aquí
     social_links: List[SocialMedia]  
     cv_file: UploadFile = File(...)
 
@@ -73,7 +72,7 @@ async def create_portfolio(
 
     # 📌 Convertir los datos a formato JSON
     social_links = [{"name": s.name, "link": str(s.link)} for s in portfolio_request.social_links]
-    projects = [{"title": p.title, "description": p.description, "image_file": image_paths[i] if i < len(image_paths) else None, "type_technologies": p.type_technologies, "year": p.year} for i, p in enumerate(portfolio_request.projects)]
+    projects = [{"title": p.title, "description": p.description, "image_file": image_paths[i] if i < len(image_paths) else None, "year": p.year} for i, p in enumerate(portfolio_request.projects)]
 
     # 📌 Crear la instancia del portafolio
     new_portfolio = Portfolio(
