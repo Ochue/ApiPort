@@ -25,16 +25,12 @@ class SocialMedia(BaseModel):
         result["link"] = str(result["link"])
         return result
 
-# 📌 Modelo para proyectos (con el nuevo nombre de campo "type_technologies" dentro de cada proyecto)
+# 📌 Modelo para proyectos
 class ProjectRequest(BaseModel):
     title: str
     description: Optional[str] = None
-    type_technologies: List[str]  # Ahora está dentro del proyecto
-    image_file: Optional[UploadFile] = None  # Reemplazo de "image" por "image_file"
+    type_technologies: List[str]
     year: Optional[int] = None
-
-    def dict(self, **kwargs):
-        return super().dict(**kwargs)
 
 # 📌 Modelo del portafolio (Solicitud)
 class PortfolioRequest(BaseModel):
@@ -44,12 +40,13 @@ class PortfolioRequest(BaseModel):
     programming_languages: List[str]  
     projects: List[ProjectRequest]  
     social_links: List[SocialMedia]  
-    cv_file: UploadFile = File(...)
 
-# 📌 **Ruta para crear un portafolio con archivos (CV, imagen y proyectos)**
+# 📌 **Ruta para crear un portafolio con archivos**
 @router.post("/")
 async def create_portfolio(
     portfolio_request: PortfolioRequest,
+    cv_file: UploadFile = File(...),
+    image_files: List[UploadFile] = File(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -57,22 +54,31 @@ async def create_portfolio(
     image_paths = []
 
     # 📌 Guardar el archivo CV
-    if portfolio_request.cv_file:
-        cv_path = f"{UPLOAD_DIR}{portfolio_request.cv_file.filename}"
+    if cv_file:
+        cv_path = os.path.join(UPLOAD_DIR, cv_file.filename)
         with open(cv_path, "wb") as buffer:
-            shutil.copyfileobj(portfolio_request.cv_file.file, buffer)
+            shutil.copyfileobj(cv_file.file, buffer)
 
-    # 📌 Guardar las imágenes de los proyectos
-    for project in portfolio_request.projects:
-        if project.image_file:
-            image_path = f"{UPLOAD_DIR}{project.image_file.filename}"
+    # 📌 Guardar imágenes de los proyectos
+    if image_files:
+        for image in image_files:
+            image_path = os.path.join(UPLOAD_DIR, image.filename)
             with open(image_path, "wb") as buffer:
-                shutil.copyfileobj(project.image_file.file, buffer)
+                shutil.copyfileobj(image.file, buffer)
             image_paths.append(image_path)
 
     # 📌 Convertir los datos a formato JSON
     social_links = [{"name": s.name, "link": str(s.link)} for s in portfolio_request.social_links]
-    projects = [{"title": p.title, "description": p.description, "type_technologies": p.type_technologies, "image_file": image_paths[i] if i < len(image_paths) else None, "year": p.year} for i, p in enumerate(portfolio_request.projects)]
+    projects = [
+        {
+            "title": p.title,
+            "description": p.description,
+            "type_technologies": p.type_technologies,
+            "image_file": image_paths[i] if i < len(image_paths) else None,
+            "year": p.year
+        }
+        for i, p in enumerate(portfolio_request.projects)
+    ]
 
     # 📌 Crear la instancia del portafolio
     new_portfolio = Portfolio(
@@ -84,7 +90,7 @@ async def create_portfolio(
         projects=json.dumps(projects),
         social_links=json.dumps(social_links),
         cv_file=cv_path,
-        image_file=image_paths[0] if image_paths else None  # Solo guardamos una imagen principal
+        image_file=image_paths[0] if image_paths else None
     )
 
     db.add(new_portfolio)
@@ -94,11 +100,11 @@ async def create_portfolio(
     return {
         "message": "Portafolio creado correctamente!",
         "portfolio_id": new_portfolio.id,
-        "cv_file": cv_path,  # Devuelve la ruta del CV
-        "image_file": image_paths[0] if image_paths else None  # Devuelve la ruta de la imagen principal
+        "cv_file": cv_path,
+        "image_file": image_paths[0] if image_paths else None
     }
 
-# 📌 **Ruta para obtener un portafolio con su CV e imagen**
+# 📌 **Ruta para obtener un portafolio**
 @router.get("/{portfolio_id}")
 async def get_portfolio(portfolio_id: int, db: Session = Depends(get_db)):
     portfolio = db.query(Portfolio).filter(Portfolio.id == portfolio_id).first()
@@ -114,8 +120,8 @@ async def get_portfolio(portfolio_id: int, db: Session = Depends(get_db)):
         "programming_languages": portfolio.programming_languages.split(","),
         "projects": json.loads(portfolio.projects),
         "social_links": json.loads(portfolio.social_links),
-        "cv_file": portfolio.cv_file,  # Ruta del CV
-        "image_file": portfolio.image_file  # Ruta de la imagen principal
+        "cv_file": portfolio.cv_file,
+        "image_file": portfolio.image_file
     }
 
 # 📌 **Ruta para actualizar un portafolio**
@@ -123,6 +129,8 @@ async def get_portfolio(portfolio_id: int, db: Session = Depends(get_db)):
 async def update_portfolio(
     portfolio_id: int,
     portfolio_request: PortfolioRequest,
+    cv_file: Optional[UploadFile] = File(None),
+    image_files: List[UploadFile] = File(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -131,27 +139,27 @@ async def update_portfolio(
     if portfolio is None:
         raise HTTPException(status_code=404, detail="Portafolio no encontrado")
 
-    # 📌 Verificar que el portafolio pertenece al usuario autenticado
     if portfolio.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="No tienes permiso para actualizar este portafolio")
 
-    cv_path = portfolio.cv_file  # Mantener la ruta del CV si no se cambia
-    image_paths = [portfolio.image_file]  # Mantener la ruta de la imagen principal si no se cambia
+    cv_path = portfolio.cv_file
+    image_paths = [portfolio.image_file] if portfolio.image_file else []
 
-    # 📌 Guardar el nuevo CV si se sube
-    if portfolio_request.cv_file:
-        cv_path = f"{UPLOAD_DIR}{portfolio_request.cv_file.filename}"
+    # 📌 Guardar nuevo CV si se sube
+    if cv_file:
+        cv_path = os.path.join(UPLOAD_DIR, cv_file.filename)
         with open(cv_path, "wb") as buffer:
-            shutil.copyfileobj(portfolio_request.cv_file.file, buffer)
-        portfolio.cv_file = cv_path  # Actualizar en la BD
+            shutil.copyfileobj(cv_file.file, buffer)
+        portfolio.cv_file = cv_path  
 
-    # 📌 Guardar nuevas imágenes de proyectos si se suben
-    for i, project in enumerate(portfolio_request.projects):
-        if project.image_file:
-            image_path = f"{UPLOAD_DIR}{project.image_file.filename}"
+    # 📌 Guardar nuevas imágenes de proyectos
+    if image_files:
+        image_paths = []
+        for image in image_files:
+            image_path = os.path.join(UPLOAD_DIR, image.filename)
             with open(image_path, "wb") as buffer:
-                shutil.copyfileobj(project.image_file.file, buffer)
-            image_paths[i] = image_path  # Actualizar la ruta de la imagen del proyecto
+                shutil.copyfileobj(image.file, buffer)
+            image_paths.append(image_path)
 
     # 📌 Actualizar campos
     portfolio.full_name = portfolio_request.full_name
@@ -159,7 +167,18 @@ async def update_portfolio(
     portfolio.spoken_languages = ",".join(portfolio_request.spoken_languages)
     portfolio.programming_languages = ",".join(portfolio_request.programming_languages)
 
-    portfolio.projects = json.dumps([p.dict() for p in portfolio_request.projects])
+    projects = [
+        {
+            "title": p.title,
+            "description": p.description,
+            "type_technologies": p.type_technologies,
+            "image_file": image_paths[i] if i < len(image_paths) else None,
+            "year": p.year
+        }
+        for i, p in enumerate(portfolio_request.projects)
+    ]
+    
+    portfolio.projects = json.dumps(projects)
     portfolio.social_links = json.dumps([s.dict() for s in portfolio_request.social_links])
 
     db.commit()
@@ -179,7 +198,6 @@ async def delete_portfolio(
     if portfolio is None:
         raise HTTPException(status_code=404, detail="Portafolio no encontrado")
 
-    # 📌 Verificar que el portafolio pertenece al usuario autenticado
     if portfolio.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="No tienes permiso para eliminar este portafolio")
 
