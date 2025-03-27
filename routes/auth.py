@@ -56,7 +56,7 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
 
 # LOGIN
 @router.post("/login")
-def login(user_data: LoginRequest, db: Session = Depends(get_db)):
+def login(user_data: LoginRequest, db: Session = Depends(get_db)): # type: ignore
     user = db.query(User).filter(User.email == user_data.email).first()
     if not user or not verify_password(user_data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
