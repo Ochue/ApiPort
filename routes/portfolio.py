@@ -93,7 +93,9 @@ async def create_portfolio(
 
     return {
         "message": "Portafolio creado correctamente!",
-        "portfolio_id": new_portfolio.id
+        "portfolio_id": new_portfolio.id,
+        "cv_file": cv_path,  # Devuelve la ruta del CV
+        "image_file": image_paths[0] if image_paths else None  # Devuelve la ruta de la imagen principal
     }
 
 # 📌 **Ruta para obtener un portafolio con su CV e imagen**
