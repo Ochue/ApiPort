@@ -8,15 +8,7 @@ import os
 app = FastAPI()
 
 # Habilitar CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173", "https://apiport.onrender.com"],
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
-    expose_headers=["*"],
-    max_age=600,
-)
+
 
 
 # Crear las tablas en la base de datos al iniciar la aplicación
