@@ -1,5 +1,4 @@
-from sqlalchemy import Column, Integer, String
-from sqlalchemy import JSON
+from sqlalchemy import Column, Integer, String, JSON
 from database import Base
 
 class Portfolio(Base):
@@ -9,9 +8,10 @@ class Portfolio(Base):
     user_id = Column(Integer, index=True)  # Relación con el usuario
     full_name = Column(String)
     description = Column(String, nullable=True)
-    technologies = Column(String)
+    type_technologies = Column(String)  # Antes "technologies"
     spoken_languages = Column(String)
     programming_languages = Column(String)
     projects = Column(JSON)  # Guardamos proyectos en formato JSON
     social_links = Column(JSON)  # Guardamos enlaces sociales en formato JSON
-    image_url = Column(String, nullable=True)
+    cv_file = Column(String, nullable=True)  # 📌 Nuevo campo para almacenar la ruta del CV
+    image_file = Column(String, nullable=True)  # 📌 Nuevo campo para almacenar la ruta de la imagen

@@ -21,7 +21,7 @@ Portfolio.metadata.create_all(bind=engine)
 
 # Incluir los routers
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
-app.include_router(portfolio.router, prefix="/portfolio", tags=["Portfolio"])
+app.include_router(portfolio.router, prefix="/portfolio", tags=["portfolio"])
 
 @app.get("/")
 def read_root():

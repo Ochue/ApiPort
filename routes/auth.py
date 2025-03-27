@@ -2,10 +2,12 @@ from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from database import get_db
 from models.user import User
-from schemas.user import UserCreate, UserLogin  # type: ignore # Importamos los esquemas
+from models.portfolio import Portfolio
+from schemas.user import UserCreate, UserLogin
 from passlib.context import CryptContext
 from jose import jwt
 from datetime import datetime, timedelta
+from fastapi.security import OAuth2PasswordBearer  # Asegúrate de importar esto
 
 router = APIRouter()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -13,6 +15,9 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 SECRET_KEY = "secret_key"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
+
+# Crear la dependencia oauth2_scheme para obtener el token
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")  # Definir oauth2_scheme correctamente
 
 # Función para cifrar contraseñas
 def hash_password(password: str) -> str:
@@ -47,7 +52,7 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_user)  # Aquí refrescamos el objeto para obtener el ID
 
-    return {"message": "Ususario registrado correctamente", "user_id": new_user.id}
+    return {"message": "Usuario registrado correctamente", "user_id": new_user.id}
 
 # LOGIN
 @router.post("/login")
@@ -61,19 +66,32 @@ def login(user_data: UserLogin, db: Session = Depends(get_db)):
 
     return {"access_token": access_token, "token_type": "bearer"}
 
-# GET USER BY ID (INCLUYENDO EL TOKEN)
+# GET USER BY ID (INCLUYENDO EL PORTAFOLIO)
 @router.get("/user/{user_id}")
-def get_user(user_id: int, db: Session = Depends(get_db)):
+def get_user(user_id: int, db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):  # Aquí se pasa el token como dependencia
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado!")
-    
-    # Generar el token para el usuario recuperado
-    access_token = create_access_token(data={"sub": user.email})
 
-    return {
+    # Buscar el portafolio asociado a ese usuario
+    portfolio = db.query(Portfolio).filter(Portfolio.user_id == user_id).first()
+
+    # Crear respuesta con usuario y portafolio (si existe)
+    response = {
         "user_id": user.id,
         "full_name": user.full_name,
         "email": user.email,
-        "access_token": access_token
     }
+
+    # Si el portafolio existe, lo añadimos a la respuesta
+    if portfolio:
+        response["portfolio"] = {
+            "id": portfolio.id,
+            "title": portfolio.title,  # Asumiendo que tu modelo Portfolio tiene estos campos
+            "description": portfolio.description,
+            "created_at": portfolio.created_at,
+        }
+    else:
+        response["portfolio"] = "No portfolio found"
+
+    return response
