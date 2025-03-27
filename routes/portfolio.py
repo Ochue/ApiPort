@@ -25,10 +25,11 @@ class SocialMedia(BaseModel):
         result["link"] = str(result["link"])
         return result
 
-# 📌 Modelo para proyectos (sin "project_technologies")
+# 📌 Modelo para proyectos (con el nuevo nombre de campo "type_technologies" dentro de cada proyecto)
 class ProjectRequest(BaseModel):
     title: str
     description: Optional[str] = None
+    type_technologies: List[str]  # Ahora está dentro del proyecto
     image_file: Optional[UploadFile] = None  # Reemplazo de "image" por "image_file"
     year: Optional[int] = None
 
@@ -39,10 +40,9 @@ class ProjectRequest(BaseModel):
 class PortfolioRequest(BaseModel):
     full_name: str
     description: Optional[str] = None
-    type_technologies: List[str]  # Esto solo se usa para el portafolio
     spoken_languages: List[str]  
     programming_languages: List[str]  
-    projects: List[ProjectRequest]  # No se menciona "project_technologies" aquí
+    projects: List[ProjectRequest]  
     social_links: List[SocialMedia]  
     cv_file: UploadFile = File(...)
 
@@ -72,14 +72,13 @@ async def create_portfolio(
 
     # 📌 Convertir los datos a formato JSON
     social_links = [{"name": s.name, "link": str(s.link)} for s in portfolio_request.social_links]
-    projects = [{"title": p.title, "description": p.description, "image_file": image_paths[i] if i < len(image_paths) else None, "year": p.year} for i, p in enumerate(portfolio_request.projects)]
+    projects = [{"title": p.title, "description": p.description, "type_technologies": p.type_technologies, "image_file": image_paths[i] if i < len(image_paths) else None, "year": p.year} for i, p in enumerate(portfolio_request.projects)]
 
     # 📌 Crear la instancia del portafolio
     new_portfolio = Portfolio(
         user_id=current_user.id,
         full_name=portfolio_request.full_name,
         description=portfolio_request.description,
-        type_technologies=",".join(portfolio_request.type_technologies),
         spoken_languages=",".join(portfolio_request.spoken_languages),
         programming_languages=",".join(portfolio_request.programming_languages),
         projects=json.dumps(projects),
@@ -109,7 +108,6 @@ async def get_portfolio(portfolio_id: int, db: Session = Depends(get_db)):
         "user_id": portfolio.user_id,
         "full_name": portfolio.full_name,
         "description": portfolio.description,
-        "type_technologies": portfolio.type_technologies.split(","),
         "spoken_languages": portfolio.spoken_languages.split(","),
         "programming_languages": portfolio.programming_languages.split(","),
         "projects": json.loads(portfolio.projects),
@@ -156,7 +154,6 @@ async def update_portfolio(
     # 📌 Actualizar campos
     portfolio.full_name = portfolio_request.full_name
     portfolio.description = portfolio_request.description
-    portfolio.type_technologies = ",".join(portfolio_request.type_technologies)
     portfolio.spoken_languages = ",".join(portfolio_request.spoken_languages)
     portfolio.programming_languages = ",".join(portfolio_request.programming_languages)
 
