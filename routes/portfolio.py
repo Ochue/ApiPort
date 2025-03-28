@@ -189,7 +189,7 @@ async def delete_portfolio(
     portfolio_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
-):
+):  
     portfolio = db.query(Portfolio).filter(Portfolio.id == portfolio_id).first()
 
     if portfolio is None:
